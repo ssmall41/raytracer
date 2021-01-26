@@ -58,13 +58,6 @@ __global__ void simple_spheres(int* bitmap, float* coords, float* radius, float*
 	bitmap[offset*3] = (int)r;
 	bitmap[offset*3 + 1] = (int)g;
 	bitmap[offset*3 + 2] = (int)b;
-	//bitmap[offset*4 + 3] = 255;
-	
-	/*
-	bitmap[offset*3] = (int)(r*255);	//Why *255??
-	bitmap[offset*3 + 1] = (int)(g*255);
-	bitmap[offset*3 + 2] = (int)(b*255);
-	*/
 }
 
 
