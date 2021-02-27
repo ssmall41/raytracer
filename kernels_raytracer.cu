@@ -6,7 +6,6 @@ __device__ float sphere_collision(float ray_orig[], float ray_dir[], float* para
 __device__ float plane_collision(float ray_orig[], float ray_dir[], float* params);
 
 __device__ collision_func collision_functions[] {sphere_collision, plane_collision};
-__device__ collision_func next_collision_func;
 
 
 __device__ void print_vector(float x[], int size)
@@ -67,7 +66,16 @@ __device__ float sphere_collision(float ray_orig[], float ray_dir[], float* para
 	float distance_plus = -dot_product + sqrtf(delta);
 	float distance_minus = -dot_product - sqrtf(delta);
 	
-	if(delta < 0.0)  // No solution
+/*
+	if((params[3]<1) && (ray_orig[0] < 50) && (ray_orig[1] < 50) && (ray_orig[1] > 36.0) && (ray_orig[1] < 38.0))
+	{
+		printf("Pixel: (%f, %f), %f %f %f\n", ray_orig[0], ray_orig[1], delta, distance_plus, distance_minus);
+		//print_vector(params, 7);
+		//printf("Pixel: (%f, %f) distance: %f\n", ray_orig[0], ray_orig[1], distance);
+	}
+*/	
+	
+	if(delta < 0.0 || (distance_plus < 0.0 && distance_minus < 0.0))  // No solution
 		return INF;
 	else if(delta < EPS)  // One solution
 		return distance_plus;
@@ -119,18 +127,16 @@ __device__ void find_closest(float ray_orig[], float ray_dir[], float* object_pa
 	*closest_type = -1;
 	*closest_obj = -1;  //The same as the row in object_params of the closest object
 
+
 	for(t=0;t<n_types;t++)
 	{
-		next_collision_func = collision_functions[t];
-	
 		for(i=0;i<n_objs[t];i++)
 		{
 			//printf("Checking obj %i, %i\n", i, curr_obj);
 		
 			float* params = &(object_params[curr_obj*n_params]);
-			//print_vector(params, n_params);
-			float distance = next_collision_func(ray_orig, ray_dir, params);
-
+			float distance = collision_functions[t](ray_orig, ray_dir, params);
+				
 			//printf("Distance: %i %f %f\n", curr_obj, distance, closest_distance);
 
 			if(distance < closest_distance)
@@ -157,9 +163,6 @@ __global__ void draw_scene(int* bitmap, unsigned int dim, float* object_params,
 	int closest_type, closest_obj;
 	float ray_orig[] = {(float)pixel_x, (float)pixel_y, 0.0};
 	float ray_dir[] = {0.0, 0.0, 1.0};
-	
-	
-	//printf("%i %i\n", ray_x, ray_y);
 	
 	//Find the closest object
 	find_closest(ray_orig, ray_dir, object_params, n_objs, n_params, n_types, &closest_type, &closest_obj);
