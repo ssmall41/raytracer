@@ -4,8 +4,9 @@
 typedef float (*collision_func)(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal);
 __device__ float sphere_collision(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal);
 __device__ float plane_collision(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal);
+__device__ float triangle_collision(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal);
 
-__device__ collision_func collision_functions[] {sphere_collision, plane_collision};
+__device__ collision_func collision_functions[] {sphere_collision, plane_collision, triangle_collision};
 
 
 __device__ void print_vector(float x[], int size)
@@ -83,23 +84,30 @@ __device__ void vector_copy(float dest[], float src[], int size)
 		dest[i] = src[i];
 }
 
+__device__ void vector_cross_product(float x[], float y[], float res[])
+{
+	res[0] = x[1]*y[2] - x[2]*y[1];
+	res[1] = x[2]*y[0] - x[0]*y[2];
+	res[2] = x[0]*y[1] - x[1]*y[0];
+}
+
+__device__ float triangle_area(float x[], float y[], float z[])
+{
+	float edge1[3], edge2[3], cp[3];
+	vector_diff(y, x, edge1);
+	vector_diff(z, x, edge2);
+	vector_cross_product(edge1, edge2, cp);
+	return 0.5 * vector_norm(cp);
+}
+
 
 //params = {r, g, b, x, y, z, radius}
 __device__ float sphere_collision(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal)
 {
-	// Unpack the ray information
-	//float ro_x = ray_orig[0], ro_y = ray_orig[1], ro_z = ray_orig[2];
-	//float rd_x = ray_dir[0], rd_y = ray_dir[1], rd_z = ray_dir[2];
-
 	// Unpack the sphere parameters
-	//float sph_x = params[3], sph_y = params[4], sph_z = params[5];
 	float* sphere_center = &(params[3]);
 	float sph_r = params[6];
-
-	// Some working space
 	float recenter[3];
-
-	//printf("Got %f %f %f %f\n", sphere_center[0], sphere_center[1], sphere_center[2], sph_r);
 
 	vector_diff(ray_orig, sphere_center, recenter);
 	float dot_product = vector_dot(ray_dir, recenter);
@@ -108,15 +116,6 @@ __device__ float sphere_collision(float ray_orig[], float ray_dir[], float* para
 	float delta = dot_product * dot_product - (norm_recenter - sph_r*sph_r);
 	float distance_plus = -dot_product + sqrtf(delta);
 	float distance_minus = -dot_product - sqrtf(delta);
-	
-/*
-	if((params[3]<1) && (ray_orig[0] < 50) && (ray_orig[1] < 50) && (ray_orig[1] > 36.0) && (ray_orig[1] < 38.0))
-	{
-		printf("Pixel: (%f, %f), %f %f %f\n", ray_orig[0], ray_orig[1], delta, distance_plus, distance_minus);
-		//print_vector(params, 7);
-		//printf("Pixel: (%f, %f) distance: %f\n", ray_orig[0], ray_orig[1], distance);
-	}
-*/	
 	
 	// Find the distance
 	float d;
@@ -148,15 +147,9 @@ __device__ float plane_collision(float ray_orig[], float ray_dir[], float* param
 	// Unpack the plane parameters
 	float* point = &(params[3]);
 	float* normal = &(params[6]);
-
-	// Some working space
 	float difference[3];
 	
 	float denominator = vector_dot(ray_dir, normal);
-	
-	//print_vector(point);
-	//print_vector(normal);
-	//printf("%f\n",denominator);
 	
 	if(fabs(denominator) < EPS)
 		return INF;
@@ -169,8 +162,56 @@ __device__ float plane_collision(float ray_orig[], float ray_dir[], float* param
 		vector_saxpy(ray_dir, ray_orig, d, intersect_point);
 		vector_copy(intersect_normal, normal, 3);
 		
-		return (d > 0.0) ? d : INF;
+		return (d > EPS) ? d : INF;
 	}
+}
+
+
+//params = {r, g, b, x1, y1, z1, x2, y2, z2, x3, y3, z3}
+__device__ float triangle_collision(float ray_orig[], float ray_dir[], float* params, float* intersect_point, float* intersect_normal)
+{
+	// Unpack the parameters
+	float* point1 = &(params[3]);
+	float* point2 = &(params[6]);
+	float* point3 = &(params[9]);
+	
+	// Find a unit normal to the triangle
+	float edge1[3], edge2[3], cp[3];
+	vector_diff(point2, point1, edge1);
+	vector_diff(point3, point1, edge2);
+	vector_cross_product(edge1, edge2, intersect_normal);
+	vector_normalize(intersect_normal);
+	
+	// Check where the ray hits the plane defined by the triangle
+	float plane_params[9];
+	vector_copy(plane_params, params, 6);
+	vector_copy(&(plane_params[6]), intersect_normal, 3);
+	float d = plane_collision(ray_orig, ray_dir, plane_params, intersect_point, intersect_normal);
+	
+	/*
+	printf("Here!\n");
+	print_vector(intersect_normal, 3);
+	//printf("%f %f %f, %f\n", ray_orig[0], ray_orig[1], ray_orig[2], d);
+	*/
+	
+	if(d < INF)
+	{	
+		float area = triangle_area(point1, point2, point3);
+		float alpha = triangle_area(intersect_point, point2, point3) / area;
+		float beta = triangle_area(intersect_point, point1, point3) / area;
+		float gamma = triangle_area(intersect_point, point1, point2) / area;
+		float sum = alpha + beta + gamma;
+		
+		//printf("d is finite %f %f %f\n", alpha, beta, gamma);
+		
+		if(alpha > -EPS && beta > -EPS && gamma > -EPS && fabs(sum - 1.0) < EPS)
+		{
+			printf("distance: %f\n", d);
+			return d;
+		}
+	}
+
+	return INF;
 }
 
 
@@ -189,21 +230,11 @@ __device__ void find_closest(float ray_orig[], float ray_dir[], float* object_pa
 	{
 		for(i=0;i<n_objs[t];i++)
 		{
-			//printf("Checking obj %i, %i\n", i, curr_obj);
-		
 			float* params = &(object_params[curr_obj*n_params]);
 			float distance = collision_functions[t](ray_orig, ray_dir, params, intersect_point, intersect_normal);
-			
-			/*
-			if((ray_orig[2] > EPS) && (ray_orig[0] == 12.0) && (ray_orig[1] == 10.0))
-			{	
-			printf("Distance: %i %f %f\n", curr_obj, distance, *closest_distance);
-			}
-			*/
 
-			if((distance < *closest_distance) && (distance > EPS))
+			if(distance < *closest_distance)
 			{
-				//printf("New closest: %i %f %f\n", curr_obj, distance, *closest_distance);
 				*closest_distance = distance;
 				*closest_type = t;
 				*closest_obj = curr_obj;
@@ -247,20 +278,9 @@ __global__ void draw_scene(int* bitmap, unsigned int dim, float* object_params,
 		     n_params, n_types, &closest_type_light, &closest_obj_light, &closest_distance_light,
 		     unused, unused);
 
-/*
-	//if(closest_intersect_point[0] > 10.0)
-	if(closest_intersect_point[0] == 12.0 && closest_intersect_point[1] == 10.0)
-	{
-	printf("(%f %f %f) to_obj: %f to_light: %f\n", closest_intersect_point[0], closest_intersect_point[1], 
-						 closest_intersect_point[2], closest_distance_light, distance_to_light);
-	printf("closest_type_light: %i \n", closest_type_light);
-	}
-*/
-
 	// Find the color to display for the pixel
 	float scaling=255.0, r=0.0, g=0.0, b=0.0;
 	if((closest_type > -1) && (closest_distance_light > distance_to_light))
-	//if((closest_type > -1))
 	{
 		float* params = &(object_params[closest_obj*n_params]);
 		r = params[0];
@@ -273,11 +293,6 @@ __global__ void draw_scene(int* bitmap, unsigned int dim, float* object_params,
 	bitmap[offset*3] = (int)(r*scaling);
 	bitmap[offset*3 + 1] = (int)(g*scaling);
 	bitmap[offset*3 + 2] = (int)(b*scaling);
-}
-
-__global__ void hello_world()
-{
-	printf("Hello world!\n");
 }
 
 
