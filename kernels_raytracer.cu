@@ -206,7 +206,7 @@ __device__ float triangle_collision(float ray_orig[], float ray_dir[], float* pa
 		
 		if(alpha > -EPS && beta > -EPS && gamma > -EPS && fabs(sum - 1.0) < EPS)
 		{
-			printf("distance: %f\n", d);
+			//printf("distance: %f\n", d);
 			return d;
 		}
 	}
