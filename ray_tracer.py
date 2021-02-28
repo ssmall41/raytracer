@@ -53,6 +53,9 @@ class raytracer:
 		
 		params_np = np.array([params], dtype=self.float)
 		
+		if obj_type == self.plane_type:
+			params_np[7:] = params_np[7:] / np.linalg.norm(params_np[7:])
+		
 		if len(self.object_params[obj_type]) == 0:
 			self.object_params[obj_type] = params_np
 		else:
