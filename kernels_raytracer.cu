@@ -201,7 +201,7 @@ __device__ float triangle_collision(float ray_orig[], float ray_dir[], float* pa
 
 
 __global__ void find_closest(float* ray_orig, float* ray_dir, int obj_type, float* object_params, int dim, int n_objs,
-			      int n_params, int* closest_type, int* closest_obj, float* closest_distance,
+			      int n_params, float* closest_distance,
 			      float* closest_intersect_point, float* closest_intersect_normal, float* closest_color)
 {
 	int pixel_x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -225,8 +225,6 @@ __global__ void find_closest(float* ray_orig, float* ray_dir, int obj_type, floa
 		if(distance < closest_distance[offset])
 		{
 			closest_distance[offset] = distance;
-			closest_type[offset] = obj_type;
-			closest_obj[offset] = i;
 			vector_copy(this_pixel_intersection_point, intersect_point, 3);
 			vector_copy(this_pixel_intersection_normal, intersect_normal, 3);
 			vector_copy(this_closest_color, params, 3);
@@ -250,8 +248,8 @@ __global__ void find_ray_to_light(int dim, float* light, float* closest_intersec
 	vector_normalize(this_ray_to_light);
 }
 
-__global__ void lambertian_shading(int* bitmap, unsigned int dim, float* closest_distance_light,
-				    float* distance_to_light, float* closest_obj, float* closest_color,
+__global__ void lambertian_shading(int* bitmap, int dim, float* closest_distance_light,
+				    float* distance_to_light, float* closest_color,
 				    float* closest_intersect_normal, float* ray_to_light)
 {
 	int pixel_x = threadIdx.x + blockIdx.x * blockDim.x;
