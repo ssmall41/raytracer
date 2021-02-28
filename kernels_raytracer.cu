@@ -61,11 +61,7 @@ __device__ float vector_norm(float x[])
 __device__ void vector_normalize(float x[])
 {
 	int i, size=3;
-	float norm = 0.0;
-	for(i=0;i<size;i++)
-		norm += x[i]*x[i];
-	norm = sqrt(norm);
-	
+	float norm = vector_norm(x);
 	for(i=0;i<size;i++)
 		x[i] = x[i] / norm;
 }
@@ -201,8 +197,8 @@ __device__ float triangle_collision(float ray_orig[], float ray_dir[], float* pa
 
 
 __global__ void find_closest(float* ray_orig, float* ray_dir, int obj_type, float* object_params, int dim, int n_objs,
-			      int n_params, float* closest_distance,
-			      float* closest_intersect_point, float* closest_intersect_normal, float* closest_color)
+			      int n_params, float* closest_distance, float* closest_intersect_point, 
+			      float* closest_intersect_normal, float* closest_color)
 {
 	int pixel_x = threadIdx.x + blockIdx.x * blockDim.x;
 	int pixel_y = threadIdx.y + blockIdx.y * blockDim.y;
